@@ -1,0 +1,30 @@
+name: 'Replace Image Digest in a file for an environment'
+description: 'Replaces the image digest in the file at the given path for the given environment'
+inputs:
+  image:
+    description: 'Docker Image Path'
+    required: true
+  tag:
+    description: 'Docker Image tag to fetch digest for'
+    required: true
+  environment:
+    description: 'Environment variable to replace'
+    required: true
+  path:
+    description: 'Path to file'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Get Docker Image Digest
+      id: get-docker-image-digest
+      run: |
+        export DOCKER_IMAGE_DIGEST=$(gcloud artifacts docker images list ${{ inputs.image }} --format='value(version)' --include-tags --filter tags~${{ inputs.tag }})
+        echo "::set-output name=DOCKER_IMAGE_DIGEST::$DOCKER_IMAGE_DIGEST"
+      shell: bash
+    - name: Update digest in ${{ inputs.path }} for ${{ inputs.environment }}
+      run: |
+        sed -ie "s/${{ inputs.environment }}\s*= \"sha256:[a-z0-9]*\"/${{ inputs.environment }} = \"$DOCKER_IMAGE_DIGEST\"/" ${{ inputs.path }}
+      shell: bash
+      env:
+        DOCKER_IMAGE_DIGEST: ${{ steps.get-docker-image-digest.outputs.DOCKER_IMAGE_DIGEST}}
